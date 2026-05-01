@@ -1,0 +1,1235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AprilTag Image Layout Tool</title>
+  <style>
+    :root {
+      --panel-bg: #f7f7f8;
+      --border: #d5d7dc;
+      --text: #1f2328;
+      --muted: #666b75;
+      --selected: #ff5a1f;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      background: #ffffff;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+    }
+
+    .sidebar {
+      padding: 20px;
+      background: var(--panel-bg);
+      border-right: 1px solid var(--border);
+      overflow: auto;
+      z-index: 20;
+    }
+
+    .sidebar h1 {
+      font-size: 20px;
+      margin: 0 0 8px;
+    }
+
+    .hint {
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    .field {
+      display: block;
+      margin-bottom: 16px;
+    }
+
+    .field span {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    input[type="file"],
+    input[type="number"],
+    button {
+      width: 100%;
+    }
+
+    input[type="file"] {
+      padding: 10px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    input[type="number"] {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    button {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #ffffff;
+      font-size: 13px;
+    }
+
+    .export-panel {
+      padding: 12px;
+      margin: 0 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #ffffff;
+    }
+
+    .export-panel label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .export-note {
+      margin: 8px 0 0;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+
+    button:hover {
+      background: #eeeeef;
+    }
+
+    .tag-control {
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #ffffff;
+      margin-bottom: 10px;
+    }
+
+    .tag-control h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .tag-control label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .small-note {
+      margin: 8px 0 16px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .main {
+      position: relative;
+      min-width: 0;
+      min-height: 100vh;
+      padding: 12px;
+      overflow: auto;
+      background:
+        linear-gradient(45deg, #f1f1f1 25%, transparent 25%),
+        linear-gradient(-45deg, #f1f1f1 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #f1f1f1 75%),
+        linear-gradient(-45deg, transparent 75%, #f1f1f1 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
+    }
+
+    .stage-wrap {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      display: inline-block;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+      user-select: none;
+    }
+
+    .stage {
+      position: relative;
+      width: 900px;
+      height: 600px;
+      background: #fafafa;
+      overflow: hidden;
+      border: 1px dashed #b9bcc4;
+      border-radius: 0;
+      touch-action: none;
+      cursor: move;
+    }
+
+    .stage.has-image {
+      border: 1px solid #b9bcc4;
+    }
+
+    #mainImage {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .empty-message {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      text-align: center;
+      padding: 30px;
+      font-size: 15px;
+    }
+
+    .line-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    .line-layer line {
+      stroke: rgb(52, 52, 52);
+      stroke-width: 1.25;
+      stroke-dasharray: 10 6;
+      stroke-linecap: butt;
+      shape-rendering: crispEdges;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .tag {
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      cursor: move;
+      user-select: none;
+      touch-action: none;
+      transform: translateZ(0);
+    }
+
+    .tag.selected {
+      outline: 2px solid var(--selected);
+      outline-offset: 0;
+      box-shadow: 0 0 0 1px rgba(255, 90, 31, 0.25);
+    }
+
+    .tag svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      pointer-events: none;
+    }
+
+    @media (max-width: 820px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .main {
+        min-height: 70vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <h1>AprilTag Image Layout</h1>
+      <p class="hint">
+        Upload an image, move the four AprilTags, resize tags or the image stage by dragging their edges,
+        and download the final overlaid image.
+      </p>
+
+      <label class="field">
+        <span>Upload image</span>
+        <input id="imageInput" type="file" accept="image/*" />
+      </label>
+
+      <button id="resetBtn" type="button">Reset tags to image corners</button>
+      <button id="downloadBtn" type="button">Download modified image</button>
+
+      <div class="export-panel">
+        <label for="exportFormat">Export format</label>
+        <select id="exportFormat">
+          <option value="png" selected>PNG — best quality, usually larger</option>
+          <option value="jpeg">JPEG/JPG — smaller, may slightly blur photo areas</option>
+          <option value="webp">WebP — often smaller, browser-dependent</option>
+          <option value="same">Same as input when possible</option>
+        </select>
+        <p id="exportFormatNote" class="export-note">
+          PNG is the default because it keeps AprilTags and dashed lines sharp. For photos, JPEG or WebP usually creates a much smaller file.
+        </p>
+      </div>
+
+      <p class="small-note">
+        Tag: drag from the middle to move; drag an edge or corner to resize.<br />
+        Image stage: drag the image area to move the whole stage; drag the stage edge or corner to resize the preview. The export keeps the original image resolution.<br /><br />
+        Line connection rule:<br />
+        Top: TL top-right → TR top-left<br />
+        Right: TR bottom-right → BR top-right<br />
+        Bottom: BR bottom-left → BL bottom-right<br />
+        Left: BL top-left → TL bottom-left
+      </p>
+
+      <div id="tagControls"></div>
+    </aside>
+
+    <main id="main" class="main">
+      <div id="stageWrap" class="stage-wrap">
+        <div id="stage" class="stage" aria-label="Image layout stage">
+          <img id="mainImage" alt="Uploaded preview" />
+
+          <div id="emptyMessage" class="empty-message">
+            Upload an image to start.<br />
+            Four draggable AprilTags will appear at the image corners.
+          </div>
+
+          <svg id="lineLayer" class="line-layer">
+            <line id="lineTop"></line>
+            <line id="lineRight"></line>
+            <line id="lineBottom"></line>
+            <line id="lineLeft"></line>
+          </svg>
+
+          <div class="tag" data-id="tl" data-name="Top Left" data-label="Tag 0" data-size="100" style="left: 0px; top: 0px;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 80 80">
+              <path style="fill:#ffffff; stroke:none;" d="M0 0L0 100L100 100L100 0L0 0z"></path>
+              <path style="fill:#000000; stroke:none;" d="M10 10L10 90L90 90L90 10L10 10z"></path>
+              <path style="fill:#ffffff; stroke:none;" d="M20 20L20 30L30 30L30 50L20 50L20 60L30 60L30 70L40 70L40 60L50 60L50 80L60 80L60 70L70 70L70 60L50 60L50 40L60 40L60 20L50 20L50 30L40 30L40 20L20 20M70 20L70 40L80 40L80 20L70 20z"></path>
+              <path style="fill:#000000; stroke:none;" d="M30 50L30 60L40 60L40 50L30 50z"></path>
+            </svg>
+          </div>
+
+          <div class="tag" data-id="tr" data-name="Top Right" data-label="Tag 1" data-size="100" style="left: 0px; top: 0px;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 80 80">
+              <path style="fill:#ffffff; stroke:none;" d="M0 0L0 100L100 100L100 0L0 0z"></path>
+              <path style="fill:#000000; stroke:none;" d="M10 10L10 90L90 90L90 10L10 10z"></path>
+              <path style="fill:#ffffff; stroke:none;" d="M20 20L20 30L30 30L30 40L20 40L20 50L30 50L30 60L20 60L20 70L30 70L30 60L40 60L40 80L50 80L50 70L60 70L60 60L50 60L50 50L60 50L60 40L80 40L80 30L70 30L70 20L50 20L50 40L40 40L40 20L20 20M70 60L70 80L80 80L80 60L70 60z"></path>
+            </svg>
+          </div>
+
+          <div class="tag" data-id="bl" data-name="Bottom Left" data-label="Tag 2" data-size="100" style="left: 0px; top: 0px;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 80 80">
+              <path style="fill:#ffffff; stroke:none;" d="M0 0L0 100L100 100L100 0L0 0z"></path>
+              <path style="fill:#000000; stroke:none;" d="M10 10L10 90L90 90L90 10L10 10z"></path>
+              <path style="fill:#ffffff; stroke:none;" d="M20 20L20 30L30 30L30 40L20 40L20 50L30 50L30 40L40 40L40 20L20 20M50 20L50 30L60 30L60 40L70 40L70 30L80 30L80 20L50 20M40 50L40 60L50 60L50 70L40 70L40 80L70 80L70 70L60 70L60 60L50 60L50 50L40 50M70 50L70 60L80 60L80 50L70 50z"></path>
+            </svg>
+          </div>
+
+          <div class="tag" data-id="br" data-name="Bottom Right" data-label="Tag 3" data-size="100" style="left: 0px; top: 0px;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 80 80">
+              <path style="fill:#ffffff; stroke:none;" d="M0 0L0 100L100 100L100 0L0 0z"></path>
+              <path style="fill:#000000; stroke:none;" d="M10 10L10 90L90 90L90 10L10 10z"></path>
+              <path style="fill:#ffffff; stroke:none;" d="M20 20L20 30L50 30L50 50L40 50L40 60L30 60L30 40L20 40L20 70L30 70L30 80L50 80L50 70L40 70L40 60L50 60L50 50L70 50L70 60L60 60L60 70L70 70L70 60L80 60L80 20L70 20L70 30L50 30L50 20L20 20z"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const stage = document.getElementById("stage");
+    const stageWrap = document.getElementById("stageWrap");
+    const main = document.getElementById("main");
+    const imageInput = document.getElementById("imageInput");
+    const mainImage = document.getElementById("mainImage");
+    const emptyMessage = document.getElementById("emptyMessage");
+    const resetBtn = document.getElementById("resetBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const exportFormat = document.getElementById("exportFormat");
+    const exportFormatNote = document.getElementById("exportFormatNote");
+    const tagControls = document.getElementById("tagControls");
+
+    const tags = Array.from(document.querySelectorAll(".tag"));
+
+    const lineMap = {
+      top: document.getElementById("lineTop"),
+      right: document.getElementById("lineRight"),
+      bottom: document.getElementById("lineBottom"),
+      left: document.getElementById("lineLeft")
+    };
+
+    const TAG_EDGE_SIZE = 8;
+    const STAGE_EDGE_SIZE = 12;
+    const MIN_TAG_SIZE = 20;
+    const MAX_TAG_SIZE = 1000;
+    const MIN_STAGE_WIDTH = 220;
+    const MAX_STAGE_WIDTH = 5000;
+
+    let activeAction = null;
+    let selectedTag = null;
+    let imageObjectUrl = null;
+    let currentFileName = "apriltag-overlay";
+    let currentInputType = "image/png";
+    let currentInputExt = "png";
+    let currentInputSizeBytes = 0;
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return "unknown";
+      const units = ["B", "KB", "MB", "GB"];
+      let size = bytes;
+      let unitIndex = 0;
+      while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex += 1;
+      }
+      return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+    }
+
+    function getFileExtension(fileName) {
+      const match = fileName.toLowerCase().match(/[.]([a-z0-9]+)$/);
+      return match ? match[1] : "";
+    }
+
+    function getPreferredInputExport() {
+      const ext = currentInputExt.toLowerCase();
+      const type = currentInputType.toLowerCase();
+
+      if (type === "image/png" || ext === "png") {
+        return { type: "image/png", ext: "png", quality: undefined, label: "PNG" };
+      }
+
+      if (type === "image/jpeg" || ["jpg", "jpeg", "jfif", "pjpeg", "pjp"].includes(ext)) {
+        return { type: "image/jpeg", ext: ext === "jfif" ? "jfif" : "jpg", quality: 0.92, label: ext === "jfif" ? "JFIF/JPEG" : "JPEG" };
+      }
+
+      if (type === "image/webp" || ext === "webp") {
+        return { type: "image/webp", ext: "webp", quality: 0.92, label: "WebP" };
+      }
+
+      return { type: "image/png", ext: "png", quality: undefined, label: "PNG fallback" };
+    }
+
+    function getExportSettings() {
+      const selected = exportFormat.value;
+
+      if (selected === "same") return getPreferredInputExport();
+      if (selected === "jpeg") return { type: "image/jpeg", ext: "jpg", quality: 0.92, label: "JPEG" };
+      if (selected === "webp") return { type: "image/webp", ext: "webp", quality: 0.92, label: "WebP" };
+      return { type: "image/png", ext: "png", quality: undefined, label: "PNG" };
+    }
+
+    function updateExportFormatNote() {
+      const settings = getExportSettings();
+      const inputInfo = currentInputSizeBytes
+        ? `Input: .${currentInputExt || "unknown"}, ${formatBytes(currentInputSizeBytes)}.`
+        : "No image uploaded yet.";
+
+      const selected = exportFormat.value;
+      let note = "";
+
+      if (selected === "png") {
+        note = "PNG is lossless and keeps tags/lines very sharp. It can be much larger than JPEG/JFIF photos.";
+      } else if (selected === "jpeg") {
+        note = "JPEG is usually much smaller for photos, but it is lossy. Photo areas may be recompressed.";
+      } else if (selected === "webp") {
+        note = "WebP often gives smaller files than JPEG with good quality. It works well in modern browsers, but support can vary in older software.";
+      } else {
+        note = `Same as input will export as ${settings.label}. Unsupported canvas output formats such as GIF, BMP, TIFF, HEIC, AVIF, or SVG fall back to PNG.`;
+      }
+
+      exportFormatNote.textContent = `${inputInfo} Output: ${settings.label}. ${note}`;
+    }
+
+    function getTag(id) {
+      return tags.find(tag => tag.dataset.id === id);
+    }
+
+    function getTagSize(tag) {
+      return Number(tag.dataset.size) || 100;
+    }
+
+    function getPos(tag) {
+      return {
+        x: parseFloat(tag.style.left) || 0,
+        y: parseFloat(tag.style.top) || 0
+      };
+    }
+
+    function getStageWrapPos() {
+      const left = parseFloat(stageWrap.style.left);
+      const top = parseFloat(stageWrap.style.top);
+      return {
+        x: Number.isFinite(left) ? left : (main.clientWidth - stage.clientWidth) / 2,
+        y: Number.isFinite(top) ? top : (main.clientHeight - stage.clientHeight) / 2
+      };
+    }
+
+    function setStageWrapPos(x, y) {
+      stageWrap.style.transform = "none";
+      stageWrap.style.left = `${x}px`;
+      stageWrap.style.top = `${y}px`;
+    }
+
+    function centerStageWrap() {
+      const x = Math.max(0, (main.clientWidth - stage.offsetWidth) / 2);
+      const y = Math.max(0, (main.clientHeight - stage.offsetHeight) / 2);
+      setStageWrapPos(x, y);
+    }
+
+    function getRenderedImageRect() {
+      if (!mainImage.naturalWidth || !mainImage.naturalHeight) return null;
+
+      const stageW = stage.clientWidth;
+      const stageH = stage.clientHeight;
+      const imgW = mainImage.naturalWidth;
+      const imgH = mainImage.naturalHeight;
+
+      const scale = Math.min(stageW / imgW, stageH / imgH);
+      const renderW = imgW * scale;
+      const renderH = imgH * scale;
+      const offsetX = (stageW - renderW) / 2;
+      const offsetY = (stageH - renderH) / 2;
+
+      return {
+        x: offsetX,
+        y: offsetY,
+        width: renderW,
+        height: renderH,
+        scale
+      };
+    }
+
+    function getTagBoundsLimit() {
+      const imageRect = getRenderedImageRect();
+      if (imageRect) return imageRect;
+
+      return {
+        x: 0,
+        y: 0,
+        width: stage.clientWidth,
+        height: stage.clientHeight
+      };
+    }
+
+    function setPos(tag, x, y) {
+      const size = getTagSize(tag);
+      const limit = getTagBoundsLimit();
+      const minX = limit.x;
+      const minY = limit.y;
+      const maxX = limit.x + limit.width - size;
+      const maxY = limit.y + limit.height - size;
+
+      tag.style.left = `${clamp(x, minX, Math.max(minX, maxX))}px`;
+      tag.style.top = `${clamp(y, minY, Math.max(minY, maxY))}px`;
+    }
+
+    function setTagSize(tag, nextSize, anchor = "top-left") {
+      const oldSize = getTagSize(tag);
+      const oldPos = getPos(tag);
+      const limit = getTagBoundsLimit();
+
+      const maxByRight = limit.x + limit.width - oldPos.x;
+      const maxByBottom = limit.y + limit.height - oldPos.y;
+      const maxByLeft = oldPos.x + oldSize - limit.x;
+      const maxByTop = oldPos.y + oldSize - limit.y;
+
+      let maxSize = Math.min(MAX_TAG_SIZE, limit.width, limit.height);
+      if (anchor.includes("left")) maxSize = Math.min(maxSize, maxByRight, maxByBottom);
+      if (anchor.includes("right")) maxSize = Math.min(maxSize, maxByLeft, maxByBottom);
+      if (anchor.includes("top")) maxSize = Math.min(maxSize, maxByRight, maxByBottom);
+      if (anchor.includes("bottom")) maxSize = Math.min(maxSize, maxByRight, maxByTop);
+
+      const size = clamp(Number(nextSize) || oldSize, MIN_TAG_SIZE, Math.max(MIN_TAG_SIZE, maxSize));
+      let nextX = oldPos.x;
+      let nextY = oldPos.y;
+
+      if (anchor.includes("right")) nextX = oldPos.x + oldSize - size;
+      if (anchor.includes("bottom")) nextY = oldPos.y + oldSize - size;
+
+      tag.dataset.size = String(size);
+      tag.style.width = `${size}px`;
+      tag.style.height = `${size}px`;
+      setPos(tag, nextX, nextY);
+    }
+
+    function corner(tag, name) {
+      const { x, y } = getPos(tag);
+      const s = getTagSize(tag);
+
+      const points = {
+        topLeft: { x, y },
+        topRight: { x: x + s, y },
+        bottomRight: { x: x + s, y: y + s },
+        bottomLeft: { x, y: y + s }
+      };
+
+      return points[name];
+    }
+
+    function shortenLine(start, end, trimRatio = 0.05) {
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      return {
+        x1: start.x + dx * trimRatio,
+        y1: start.y + dy * trimRatio,
+        x2: end.x - dx * trimRatio,
+        y2: end.y - dy * trimRatio
+      };
+    }
+
+    function drawLine(line, start, end) {
+      const shortened = shortenLine(start, end, 0.05);
+      line.setAttribute("x1", shortened.x1);
+      line.setAttribute("y1", shortened.y1);
+      line.setAttribute("x2", shortened.x2);
+      line.setAttribute("y2", shortened.y2);
+    }
+
+    function updateLines() {
+      const tl = getTag("tl");
+      const tr = getTag("tr");
+      const bl = getTag("bl");
+      const br = getTag("br");
+
+      drawLine(lineMap.top, corner(tl, "topRight"), corner(tr, "topLeft"));
+      drawLine(lineMap.right, corner(tr, "bottomRight"), corner(br, "topRight"));
+      drawLine(lineMap.bottom, corner(br, "bottomLeft"), corner(bl, "bottomRight"));
+      drawLine(lineMap.left, corner(bl, "topLeft"), corner(tl, "bottomLeft"));
+
+      updateControlValues();
+    }
+
+    function resetTagsToCorners() {
+      const limit = getTagBoundsLimit();
+      const tl = getTag("tl");
+      const tr = getTag("tr");
+      const bl = getTag("bl");
+      const br = getTag("br");
+
+      setPos(tl, limit.x, limit.y);
+      setPos(tr, limit.x + limit.width - getTagSize(tr), limit.y);
+      setPos(bl, limit.x, limit.y + limit.height - getTagSize(bl));
+      setPos(br, limit.x + limit.width - getTagSize(br), limit.y + limit.height - getTagSize(br));
+
+      updateLines();
+    }
+
+    function setSelected(tag) {
+      selectedTag = tag;
+      tags.forEach(t => t.classList.toggle("selected", t === tag));
+    }
+
+    function makeControls() {
+      tagControls.innerHTML = tags.map(tag => `
+        <div class="tag-control">
+          <h2>${tag.dataset.label} — ${tag.dataset.name}</h2>
+          <div class="grid-3">
+            <label>
+              X px
+              <input type="number" data-tag="${tag.dataset.id}" data-input="x" min="0" step="1" />
+            </label>
+            <label>
+              Y px
+              <input type="number" data-tag="${tag.dataset.id}" data-input="y" min="0" step="1" />
+            </label>
+            <label>
+              Size px
+              <input type="number" data-tag="${tag.dataset.id}" data-input="size" min="20" step="1" />
+            </label>
+          </div>
+        </div>
+      `).join("");
+
+      tagControls.addEventListener("input", event => {
+        const input = event.target;
+        if (!input.matches('input[type="number"]')) return;
+
+        const tag = getTag(input.dataset.tag);
+        const current = getPos(tag);
+
+        if (input.dataset.input === "size") {
+          setTagSize(tag, Number(input.value), "top-left");
+        } else {
+          const nextX = input.dataset.input === "x" ? Number(input.value) : current.x;
+          const nextY = input.dataset.input === "y" ? Number(input.value) : current.y;
+          setPos(tag, nextX, nextY);
+        }
+
+        setSelected(tag);
+        updateLines();
+      });
+    }
+
+    function updateControlValues() {
+      tags.forEach(tag => {
+        const { x, y } = getPos(tag);
+        const size = getTagSize(tag);
+
+        const xInput = tagControls.querySelector(`input[data-tag="${tag.dataset.id}"][data-input="x"]`);
+        const yInput = tagControls.querySelector(`input[data-tag="${tag.dataset.id}"][data-input="y"]`);
+        const sizeInput = tagControls.querySelector(`input[data-tag="${tag.dataset.id}"][data-input="size"]`);
+
+        if (xInput && document.activeElement !== xInput) xInput.value = Math.round(x);
+        if (yInput && document.activeElement !== yInput) yInput.value = Math.round(y);
+        if (sizeInput && document.activeElement !== sizeInput) sizeInput.value = Math.round(size);
+      });
+    }
+
+    function fitStageToRightPanel() {
+      if (!mainImage.naturalWidth || !mainImage.naturalHeight) return;
+
+      const availableWidth = Math.max(300, main.clientWidth - 24);
+      const availableHeight = Math.max(300, main.clientHeight - 24);
+
+      const naturalW = mainImage.naturalWidth;
+      const naturalH = mainImage.naturalHeight;
+      const scale = Math.min(availableWidth / naturalW, availableHeight / naturalH);
+
+      const stageW = Math.max(MIN_STAGE_WIDTH, Math.round(naturalW * scale));
+      const stageH = Math.max(160, Math.round(naturalH * scale));
+
+      stage.style.width = `${stageW}px`;
+      stage.style.height = `${stageH}px`;
+      centerStageWrap();
+    }
+
+    function getStageAspectRatio() {
+      if (mainImage.naturalWidth && mainImage.naturalHeight) {
+        return mainImage.naturalWidth / mainImage.naturalHeight;
+      }
+      return stage.clientWidth / stage.clientHeight;
+    }
+
+    function getRelativeTagLayouts() {
+      const rect = getRenderedImageRect() || {
+        x: 0,
+        y: 0,
+        width: stage.clientWidth,
+        height: stage.clientHeight
+      };
+
+      return tags.map(tag => {
+        const pos = getPos(tag);
+        return {
+          tag,
+          relX: (pos.x - rect.x) / rect.width,
+          relY: (pos.y - rect.y) / rect.height,
+          relSize: getTagSize(tag) / rect.width
+        };
+      });
+    }
+
+    function applyRelativeTagLayouts(layouts) {
+      const rect = getRenderedImageRect() || {
+        x: 0,
+        y: 0,
+        width: stage.clientWidth,
+        height: stage.clientHeight
+      };
+
+      layouts.forEach(item => {
+        const size = item.relSize * rect.width;
+        item.tag.dataset.size = String(size);
+        item.tag.style.width = `${size}px`;
+        item.tag.style.height = `${size}px`;
+        setPos(item.tag, rect.x + item.relX * rect.width, rect.y + item.relY * rect.height);
+      });
+    }
+
+    function setStagePreviewSizeFromAction(action, nextWidth) {
+      const aspect = action.stageAspect;
+      const width = clamp(nextWidth, MIN_STAGE_WIDTH, MAX_STAGE_WIDTH);
+      const height = width / aspect;
+
+      let nextLeft = action.startStageLeft;
+      let nextTop = action.startStageTop;
+
+      if (action.resizeDirection.includes("left")) {
+        nextLeft = action.startStageLeft + action.startStageWidth - width;
+      }
+      if (action.resizeDirection.includes("top")) {
+        nextTop = action.startStageTop + action.startStageHeight - height;
+      }
+
+      stage.style.width = `${width}px`;
+      stage.style.height = `${height}px`;
+      setStageWrapPos(nextLeft, nextTop);
+      applyRelativeTagLayouts(action.tagLayouts);
+    }
+
+    function getResizedStageWidth(action, dx, dy) {
+      const direction = action.resizeDirection;
+      const aspect = action.stageAspect;
+      const candidates = [];
+
+      if (direction.includes("right")) candidates.push(action.startStageWidth + dx);
+      if (direction.includes("left")) candidates.push(action.startStageWidth - dx);
+      if (direction.includes("bottom")) candidates.push((action.startStageHeight + dy) * aspect);
+      if (direction.includes("top")) candidates.push((action.startStageHeight - dy) * aspect);
+
+      if (!candidates.length) return action.startStageWidth;
+
+      return candidates.reduce((best, current) => {
+        return Math.abs(current - action.startStageWidth) > Math.abs(best - action.startStageWidth)
+          ? current
+          : best;
+      }, candidates[0]);
+    }
+
+    function stagePointToImagePoint(point, imageRect) {
+      const exportScale = mainImage.naturalWidth / imageRect.width;
+      return {
+        x: (point.x - imageRect.x) * exportScale,
+        y: (point.y - imageRect.y) * exportScale
+      };
+    }
+
+    function getExportCorner(tag, cornerName, imageRect) {
+      return stagePointToImagePoint(corner(tag, cornerName), imageRect);
+    }
+
+    function getFillColor(pathElement) {
+      const style = pathElement.getAttribute("style") || "";
+      const fillMatch = style.match(/fill[ ]*:[ ]*([^;]+)/i);
+      if (fillMatch) return fillMatch[1].trim();
+      return pathElement.getAttribute("fill") || "#000000";
+    }
+
+    function drawSvgTagAsVector(ctx, tag, x, y, size) {
+      const svg = tag.querySelector("svg");
+      const paths = Array.from(svg.querySelectorAll("path"));
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, size, size);
+      ctx.clip();
+      ctx.translate(x, y);
+      ctx.scale(size / 80, size / 80);
+      ctx.translate(-10, -10);
+
+      paths.forEach(pathElement => {
+        const d = pathElement.getAttribute("d");
+        if (!d) return;
+        ctx.fillStyle = getFillColor(pathElement);
+        ctx.fill(new Path2D(d));
+      });
+
+      ctx.restore();
+    }
+
+    function drawCanvasLine(ctx, start, end) {
+      const shortened = shortenLine(start, end, 0.05);
+      ctx.beginPath();
+      ctx.moveTo(shortened.x1, shortened.y1);
+      ctx.lineTo(shortened.x2, shortened.y2);
+      ctx.stroke();
+    }
+
+    async function downloadModifiedImage() {
+      if (!mainImage.naturalWidth || !mainImage.naturalHeight) {
+        alert("Please upload an image first.");
+        return;
+      }
+
+      const imageRect = getRenderedImageRect();
+      if (!imageRect) return;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = mainImage.naturalWidth;
+      canvas.height = mainImage.naturalHeight;
+
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(mainImage, 0, 0, canvas.width, canvas.height);
+
+      const exportScale = mainImage.naturalWidth / imageRect.width;
+
+      const tl = getTag("tl");
+      const tr = getTag("tr");
+      const bl = getTag("bl");
+      const br = getTag("br");
+
+      ctx.save();
+      ctx.strokeStyle = "rgb(52, 52, 52)";
+      ctx.lineWidth = Math.max(1.25, 1.25 * exportScale);
+      ctx.setLineDash([10 * exportScale, 6 * exportScale]);
+      ctx.lineCap = "butt";
+
+      drawCanvasLine(ctx, getExportCorner(tl, "topRight", imageRect), getExportCorner(tr, "topLeft", imageRect));
+      drawCanvasLine(ctx, getExportCorner(tr, "bottomRight", imageRect), getExportCorner(br, "topRight", imageRect));
+      drawCanvasLine(ctx, getExportCorner(br, "bottomLeft", imageRect), getExportCorner(bl, "bottomRight", imageRect));
+      drawCanvasLine(ctx, getExportCorner(bl, "topLeft", imageRect), getExportCorner(tl, "bottomLeft", imageRect));
+
+      ctx.restore();
+
+      for (const tag of tags) {
+        const pos = getPos(tag);
+        const size = getTagSize(tag);
+
+        const drawX = (pos.x - imageRect.x) * exportScale;
+        const drawY = (pos.y - imageRect.y) * exportScale;
+        const drawSize = size * exportScale;
+
+        drawSvgTagAsVector(ctx, tag, drawX, drawY, drawSize);
+      }
+
+      const settings = getExportSettings();
+
+      canvas.toBlob(blob => {
+        if (!blob) {
+          alert("Failed to export image. Try PNG instead.");
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${currentFileName}-with-apriltags.${settings.ext}`;
+        link.click();
+        URL.revokeObjectURL(url);
+      }, settings.type, settings.quality);
+    }
+
+    function pointIsInsideRenderedImage(clientX, clientY) {
+      const imageRect = getRenderedImageRect();
+      if (!imageRect) return false;
+
+      const stageBox = stage.getBoundingClientRect();
+      const x = clientX - stageBox.left;
+      const y = clientY - stageBox.top;
+
+      return (
+        x >= imageRect.x &&
+        x <= imageRect.x + imageRect.width &&
+        y >= imageRect.y &&
+        y <= imageRect.y + imageRect.height
+      );
+    }
+
+    function getResizeDirectionFromBox(box, event, edgeSize) {
+      const x = event.clientX - box.left;
+      const y = event.clientY - box.top;
+      const w = box.width;
+      const h = box.height;
+
+      const nearLeft = x <= edgeSize;
+      const nearRight = x >= w - edgeSize;
+      const nearTop = y <= edgeSize;
+      const nearBottom = y >= h - edgeSize;
+
+      let horizontal = "";
+      let vertical = "";
+
+      if (nearLeft) horizontal = "left";
+      else if (nearRight) horizontal = "right";
+
+      if (nearTop) vertical = "top";
+      else if (nearBottom) vertical = "bottom";
+
+      if (!horizontal && !vertical) return "move";
+      return `${vertical}${horizontal}` || horizontal || vertical;
+    }
+
+    function getTagResizeDirection(tag, event) {
+      return getResizeDirectionFromBox(tag.getBoundingClientRect(), event, TAG_EDGE_SIZE);
+    }
+
+    function getStageResizeDirection(event) {
+      return getResizeDirectionFromBox(stage.getBoundingClientRect(), event, STAGE_EDGE_SIZE);
+    }
+
+    function getCursorForDirection(direction) {
+      const cursorMap = {
+        top: "n-resize",
+        bottom: "s-resize",
+        left: "w-resize",
+        right: "e-resize",
+        topleft: "nwse-resize",
+        bottomright: "nwse-resize",
+        topright: "nesw-resize",
+        bottomleft: "nesw-resize",
+        move: "move"
+      };
+      return cursorMap[direction] || "move";
+    }
+
+    function getResizeAnchor(direction) {
+      const anchorMap = {
+        top: "bottom",
+        bottom: "top",
+        left: "right",
+        right: "left",
+        topleft: "bottomright",
+        topright: "bottomleft",
+        bottomleft: "topright",
+        bottomright: "topleft"
+      };
+      return anchorMap[direction] || "top-left";
+    }
+
+    function getSizeFromTagResize(direction, startSize, dx, dy) {
+      let delta = 0;
+
+      if (direction === "right") delta = dx;
+      else if (direction === "left") delta = -dx;
+      else if (direction === "bottom") delta = dy;
+      else if (direction === "top") delta = -dy;
+      else if (direction === "bottomright") delta = Math.max(dx, dy);
+      else if (direction === "bottomleft") delta = Math.max(-dx, dy);
+      else if (direction === "topright") delta = Math.max(dx, -dy);
+      else if (direction === "topleft") delta = Math.max(-dx, -dy);
+
+      return startSize + delta;
+    }
+
+    imageInput.addEventListener("change", event => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      currentFileName = file.name.replace(/[.][^.]+$/, "");
+      currentInputType = file.type || "image/png";
+      currentInputExt = getFileExtension(file.name) || currentInputType.replace("image/", "") || "png";
+      currentInputSizeBytes = file.size || 0;
+      updateExportFormatNote();
+
+      if (imageObjectUrl) URL.revokeObjectURL(imageObjectUrl);
+      imageObjectUrl = URL.createObjectURL(file);
+
+      mainImage.src = imageObjectUrl;
+
+      mainImage.onload = () => {
+        emptyMessage.style.display = "none";
+        stage.classList.add("has-image");
+
+        fitStageToRightPanel();
+        resetTagsToCorners();
+      };
+    });
+
+    resetBtn.addEventListener("click", resetTagsToCorners);
+    downloadBtn.addEventListener("click", downloadModifiedImage);
+    exportFormat.addEventListener("change", updateExportFormatNote);
+
+    stage.addEventListener("pointerdown", event => {
+      if (event.target.closest(".tag")) return;
+      event.preventDefault();
+      stage.setPointerCapture(event.pointerId);
+
+      const direction = getStageResizeDirection(event);
+      const stagePos = getStageWrapPos();
+
+      activeAction = {
+        type: "stage",
+        mode: direction === "move" ? "move" : "resize",
+        pointerId: event.pointerId,
+        resizeDirection: direction,
+        startPointerX: event.clientX,
+        startPointerY: event.clientY,
+        startStageLeft: stagePos.x,
+        startStageTop: stagePos.y,
+        startStageWidth: stage.clientWidth,
+        startStageHeight: stage.clientHeight,
+        stageAspect: getStageAspectRatio(),
+        tagLayouts: getRelativeTagLayouts()
+      };
+    });
+
+    stage.addEventListener("pointermove", event => {
+      if (!activeAction) {
+        const direction = getStageResizeDirection(event);
+        stage.style.cursor = getCursorForDirection(direction);
+        return;
+      }
+
+      if (activeAction.type !== "stage" || activeAction.pointerId !== event.pointerId) return;
+
+      const dx = event.clientX - activeAction.startPointerX;
+      const dy = event.clientY - activeAction.startPointerY;
+
+      if (activeAction.mode === "move") {
+        setStageWrapPos(activeAction.startStageLeft + dx, activeAction.startStageTop + dy);
+      } else {
+        const nextWidth = getResizedStageWidth(activeAction, dx, dy);
+        setStagePreviewSizeFromAction(activeAction, nextWidth);
+        updateLines();
+      }
+    });
+
+    stage.addEventListener("pointerup", event => {
+      if (activeAction && activeAction.type === "stage" && activeAction.pointerId === event.pointerId) {
+        activeAction = null;
+        const direction = getStageResizeDirection(event);
+        stage.style.cursor = getCursorForDirection(direction);
+      }
+    });
+
+    stage.addEventListener("pointercancel", () => {
+      activeAction = null;
+    });
+
+    tags.forEach(tag => {
+      setTagSize(tag, getTagSize(tag));
+
+      tag.addEventListener("pointerdown", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        tag.setPointerCapture(event.pointerId);
+        setSelected(tag);
+
+        const resizeDirection = getTagResizeDirection(tag, event);
+        const pos = getPos(tag);
+
+        activeAction = {
+          type: "tag",
+          pointerId: event.pointerId,
+          mode: resizeDirection === "move" ? "move" : "resize",
+          resizeDirection,
+          resizeAnchor: getResizeAnchor(resizeDirection),
+          startPointerX: event.clientX,
+          startPointerY: event.clientY,
+          startTagX: pos.x,
+          startTagY: pos.y,
+          startSize: getTagSize(tag),
+          tag
+        };
+      });
+
+      tag.addEventListener("pointermove", event => {
+        if (!activeAction || activeAction.type !== "tag" || activeAction.pointerId !== event.pointerId || activeAction.tag !== tag) {
+          if (!activeAction) {
+            const direction = getTagResizeDirection(tag, event);
+            tag.style.cursor = getCursorForDirection(direction);
+          }
+          return;
+        }
+
+        const dx = event.clientX - activeAction.startPointerX;
+        const dy = event.clientY - activeAction.startPointerY;
+
+        if (activeAction.mode === "resize") {
+          const nextSize = getSizeFromTagResize(activeAction.resizeDirection, activeAction.startSize, dx, dy);
+
+          tag.dataset.size = String(activeAction.startSize);
+          tag.style.width = `${activeAction.startSize}px`;
+          tag.style.height = `${activeAction.startSize}px`;
+          tag.style.left = `${activeAction.startTagX}px`;
+          tag.style.top = `${activeAction.startTagY}px`;
+
+          setTagSize(tag, nextSize, activeAction.resizeAnchor);
+        } else {
+          setPos(tag, activeAction.startTagX + dx, activeAction.startTagY + dy);
+        }
+
+        updateLines();
+      });
+
+      tag.addEventListener("pointerup", event => {
+        if (activeAction && activeAction.type === "tag" && activeAction.pointerId === event.pointerId) {
+          activeAction = null;
+          const direction = getTagResizeDirection(tag, event);
+          tag.style.cursor = getCursorForDirection(direction);
+        }
+      });
+
+      tag.addEventListener("pointercancel", () => {
+        activeAction = null;
+      });
+
+      tag.addEventListener("pointerleave", () => {
+        if (!activeAction) tag.style.cursor = "move";
+      });
+    });
+
+    document.addEventListener("pointerdown", event => {
+      const clickedTag = event.target.closest(".tag");
+      const clickedSidebar = event.target.closest(".sidebar");
+
+      if (clickedTag || clickedSidebar) return;
+
+      if (!pointIsInsideRenderedImage(event.clientX, event.clientY)) {
+        setSelected(null);
+      }
+    });
+
+    window.addEventListener("keydown", event => {
+      if (!selectedTag) return;
+
+      const moveKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+      if (!moveKeys.includes(event.key)) return;
+
+      event.preventDefault();
+
+      const step = event.shiftKey ? 10 : 1;
+      const pos = getPos(selectedTag);
+      const next = { ...pos };
+
+      if (event.key === "ArrowUp") next.y -= step;
+      if (event.key === "ArrowDown") next.y += step;
+      if (event.key === "ArrowLeft") next.x -= step;
+      if (event.key === "ArrowRight") next.x += step;
+
+      setPos(selectedTag, next.x, next.y);
+      updateLines();
+    });
+
+    window.addEventListener("resize", () => {
+      updateLines();
+    });
+
+    makeControls();
+    updateExportFormatNote();
+    resetTagsToCorners();
+  </script>
+</body>
+</html>
