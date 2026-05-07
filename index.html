@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AprilTag Image Layout Tool</title>
+  <title>AprilTag Overlay Tool</title>
+
+  <!-- TIFF decode / encode library -->
+  <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
+
   <style>
     :root {
       --panel-bg: #f7f7f8;
@@ -11,6 +15,8 @@
       --text: #1f2328;
       --muted: #666b75;
       --selected: #ff5a1f;
+      --download-ready: #ff8a1f;
+      --download-ready-hover: #f07d12;
     }
 
     * {
@@ -31,7 +37,7 @@
     .app {
       min-height: 100vh;
       display: grid;
-      grid-template-columns: 320px 1fr;
+      grid-template-columns: 340px 1fr;
     }
 
     .sidebar {
@@ -43,13 +49,13 @@
     }
 
     .sidebar h1 {
-      font-size: 20px;
+      font-size: 22px;
       margin: 0 0 8px;
     }
 
     .hint {
       font-size: 13px;
-      line-height: 1.45;
+      line-height: 1.5;
       color: var(--muted);
       margin-bottom: 18px;
     }
@@ -68,6 +74,7 @@
 
     input[type="file"],
     input[type="number"],
+    select,
     button {
       width: 100%;
     }
@@ -79,11 +86,13 @@
       border-radius: 10px;
     }
 
-    input[type="number"] {
+    input[type="number"],
+    select {
       padding: 8px 10px;
       border: 1px solid var(--border);
       border-radius: 8px;
       font-size: 13px;
+      background: #ffffff;
     }
 
     button {
@@ -94,15 +103,22 @@
       cursor: pointer;
       font-weight: 600;
       margin-bottom: 10px;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     }
 
-    select {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: #ffffff;
-      font-size: 13px;
+    button:hover {
+      background: #eeeeef;
+    }
+
+    button.ready-download {
+      background: var(--download-ready);
+      border-color: var(--download-ready);
+      color: #ffffff;
+    }
+
+    button.ready-download:hover {
+      background: var(--download-ready-hover);
+      border-color: var(--download-ready-hover);
     }
 
     .export-panel {
@@ -125,10 +141,6 @@
       font-size: 12px;
       line-height: 1.45;
       color: var(--muted);
-    }
-
-    button:hover {
-      background: #eeeeef;
     }
 
     .tag-control {
@@ -269,7 +281,7 @@
       pointer-events: none;
     }
 
-    @media (max-width: 820px) {
+    @media (max-width: 900px) {
       .app {
         grid-template-columns: 1fr;
       }
@@ -288,7 +300,8 @@
 <body>
   <div class="app">
     <aside class="sidebar">
-      <h1>AprilTag Image Layout</h1>
+      <h1>AprilTag Overlay Tool</h1>
+
       <p class="hint">
         Upload an image, move the four AprilTags, resize tags or the image stage by dragging their edges,
         and download the final overlaid image.
@@ -296,28 +309,29 @@
 
       <label class="field">
         <span>Upload image</span>
-        <input id="imageInput" type="file" accept="image/*" />
+        <input id="imageInput" type="file" accept="image/*,.tif,.tiff,.jfif" />
       </label>
 
-      <button id="resetBtn" type="button">Reset tags to image corners</button>
+      <button id="resetBtn" type="button">Reset tags to ROI corners</button>
       <button id="downloadBtn" type="button">Download modified image</button>
 
       <div class="export-panel">
         <label for="exportFormat">Export format</label>
         <select id="exportFormat">
           <option value="png" selected>PNG — best quality, usually larger</option>
-          <option value="jpeg">JPEG/JPG — smaller, may slightly blur photo areas</option>
-          <option value="webp">WebP — often smaller, browser-dependent</option>
+          <option value="jpeg">JPEG/JPG — smaller, lossy</option>
+          <option value="tiff">TIFF/TIF — scientific format, usually large</option>
           <option value="same">Same as input when possible</option>
         </select>
         <p id="exportFormatNote" class="export-note">
-          PNG is the default because it keeps AprilTags and dashed lines sharp. For photos, JPEG or WebP usually creates a much smaller file.
+          PNG is the default because it keeps AprilTags and dashed lines sharp.
         </p>
       </div>
 
       <p class="small-note">
         Tag: drag from the middle to move; drag an edge or corner to resize.<br />
-        Image stage: drag the image area to move the whole stage; drag the stage edge or corner to resize the preview. The export keeps the original image resolution.<br /><br />
+        Image stage: drag the image area to move the whole stage; drag the stage edge or corner to resize the preview.
+        The export keeps the original image resolution.<br /><br />
         Line connection rule:<br />
         Top: TL top-right → TR top-left<br />
         Right: TR bottom-right → BR top-right<br />
@@ -335,7 +349,7 @@
 
           <div id="emptyMessage" class="empty-message">
             Upload an image to start.<br />
-            Four draggable AprilTags will appear at the image corners.
+            Four draggable AprilTags will appear near the image corners.
           </div>
 
           <svg id="lineLayer" class="line-layer">
@@ -345,6 +359,7 @@
             <line id="lineLeft"></line>
           </svg>
 
+          <!-- Top Left -->
           <div class="tag" data-id="tl" data-name="Top Left" data-label="Tag 0" data-size="100" style="left: 0px; top: 0px;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 80 80">
               <path style="fill:#ffffff; stroke:none;" d="M0 0L0 100L100 100L100 0L0 0z"></path>
@@ -354,6 +369,7 @@
             </svg>
           </div>
 
+          <!-- Top Right -->
           <div class="tag" data-id="tr" data-name="Top Right" data-label="Tag 1" data-size="100" style="left: 0px; top: 0px;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 80 80">
               <path style="fill:#ffffff; stroke:none;" d="M0 0L0 100L100 100L100 0L0 0z"></path>
@@ -362,6 +378,7 @@
             </svg>
           </div>
 
+          <!-- Bottom Left -->
           <div class="tag" data-id="bl" data-name="Bottom Left" data-label="Tag 2" data-size="100" style="left: 0px; top: 0px;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 80 80">
               <path style="fill:#ffffff; stroke:none;" d="M0 0L0 100L100 100L100 0L0 0z"></path>
@@ -370,6 +387,7 @@
             </svg>
           </div>
 
+          <!-- Bottom Right -->
           <div class="tag" data-id="br" data-name="Bottom Right" data-label="Tag 3" data-size="100" style="left: 0px; top: 0px;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 80 80">
               <path style="fill:#ffffff; stroke:none;" d="M0 0L0 100L100 100L100 0L0 0z"></path>
@@ -410,14 +428,20 @@
     const MAX_TAG_SIZE = 1000;
     const MIN_STAGE_WIDTH = 220;
     const MAX_STAGE_WIDTH = 5000;
+    const ROI_MARGIN_RATIO = 0.05;
 
     let activeAction = null;
     let selectedTag = null;
-    let imageObjectUrl = null;
+    let currentPreviewUrl = null;
+
     let currentFileName = "apriltag-overlay";
     let currentInputType = "image/png";
     let currentInputExt = "png";
     let currentInputSizeBytes = 0;
+
+    let originalSourceForExport = null;
+    let originalPixelWidth = 0;
+    let originalPixelHeight = 0;
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
@@ -440,54 +464,12 @@
       return match ? match[1] : "";
     }
 
-    function getPreferredInputExport() {
-      const ext = currentInputExt.toLowerCase();
-      const type = currentInputType.toLowerCase();
-
-      if (type === "image/png" || ext === "png") {
-        return { type: "image/png", ext: "png", quality: undefined, label: "PNG" };
-      }
-
-      if (type === "image/jpeg" || ["jpg", "jpeg", "jfif", "pjpeg", "pjp"].includes(ext)) {
-        return { type: "image/jpeg", ext: ext === "jfif" ? "jfif" : "jpg", quality: 0.92, label: ext === "jfif" ? "JFIF/JPEG" : "JPEG" };
-      }
-
-      if (type === "image/webp" || ext === "webp") {
-        return { type: "image/webp", ext: "webp", quality: 0.92, label: "WebP" };
-      }
-
-      return { type: "image/png", ext: "png", quality: undefined, label: "PNG fallback" };
+    function getSourceWidth() {
+      return originalPixelWidth || mainImage.naturalWidth || 0;
     }
 
-    function getExportSettings() {
-      const selected = exportFormat.value;
-
-      if (selected === "same") return getPreferredInputExport();
-      if (selected === "jpeg") return { type: "image/jpeg", ext: "jpg", quality: 0.92, label: "JPEG" };
-      if (selected === "webp") return { type: "image/webp", ext: "webp", quality: 0.92, label: "WebP" };
-      return { type: "image/png", ext: "png", quality: undefined, label: "PNG" };
-    }
-
-    function updateExportFormatNote() {
-      const settings = getExportSettings();
-      const inputInfo = currentInputSizeBytes
-        ? `Input: .${currentInputExt || "unknown"}, ${formatBytes(currentInputSizeBytes)}.`
-        : "No image uploaded yet.";
-
-      const selected = exportFormat.value;
-      let note = "";
-
-      if (selected === "png") {
-        note = "PNG is lossless and keeps tags/lines very sharp. It can be much larger than JPEG/JFIF photos.";
-      } else if (selected === "jpeg") {
-        note = "JPEG is usually much smaller for photos, but it is lossy. Photo areas may be recompressed.";
-      } else if (selected === "webp") {
-        note = "WebP often gives smaller files than JPEG with good quality. It works well in modern browsers, but support can vary in older software.";
-      } else {
-        note = `Same as input will export as ${settings.label}. Unsupported canvas output formats such as GIF, BMP, TIFF, HEIC, AVIF, or SVG fall back to PNG.`;
-      }
-
-      exportFormatNote.textContent = `${inputInfo} Output: ${settings.label}. ${note}`;
+    function getSourceHeight() {
+      return originalPixelHeight || mainImage.naturalHeight || 0;
     }
 
     function getTag(id) {
@@ -527,12 +509,12 @@
     }
 
     function getRenderedImageRect() {
-      if (!mainImage.naturalWidth || !mainImage.naturalHeight) return null;
+      const imgW = getSourceWidth();
+      const imgH = getSourceHeight();
+      if (!imgW || !imgH) return null;
 
       const stageW = stage.clientWidth;
       const stageH = stage.clientHeight;
-      const imgW = mainImage.naturalWidth;
-      const imgH = mainImage.naturalHeight;
 
       const scale = Math.min(stageW / imgW, stageH / imgH);
       const renderW = imgW * scale;
@@ -590,6 +572,7 @@
       if (anchor.includes("bottom")) maxSize = Math.min(maxSize, maxByRight, maxByTop);
 
       const size = clamp(Number(nextSize) || oldSize, MIN_TAG_SIZE, Math.max(MIN_TAG_SIZE, maxSize));
+
       let nextX = oldPos.x;
       let nextY = oldPos.y;
 
@@ -649,20 +632,6 @@
       updateControlValues();
     }
 
-    function resetTagsToCorners() {
-      const limit = getTagBoundsLimit();
-      const tl = getTag("tl");
-      const tr = getTag("tr");
-      const bl = getTag("bl");
-      const br = getTag("br");
-
-      setPos(tl, limit.x, limit.y);
-      setPos(tr, limit.x + limit.width - getTagSize(tr), limit.y);
-      setPos(bl, limit.x, limit.y + limit.height - getTagSize(bl));
-      setPos(br, limit.x + limit.width - getTagSize(br), limit.y + limit.height - getTagSize(br));
-
-      updateLines();
-    }
 
     function setSelected(tag) {
       selectedTag = tag;
@@ -726,27 +695,29 @@
     }
 
     function fitStageToRightPanel() {
-      if (!mainImage.naturalWidth || !mainImage.naturalHeight) return;
+      const naturalW = getSourceWidth();
+      const naturalH = getSourceHeight();
+      if (!naturalW || !naturalH) return;
 
-      const availableWidth = Math.max(300, main.clientWidth - 24);
-      const availableHeight = Math.max(300, main.clientHeight - 24);
+      const availableWidth = Math.max(220, main.clientWidth - 24);
+      const availableHeight = Math.max(220, main.clientHeight - 24);
 
-      const naturalW = mainImage.naturalWidth;
-      const naturalH = mainImage.naturalHeight;
       const scale = Math.min(availableWidth / naturalW, availableHeight / naturalH);
 
-      const stageW = Math.max(MIN_STAGE_WIDTH, Math.round(naturalW * scale));
-      const stageH = Math.max(160, Math.round(naturalH * scale));
+      const stageW = Math.max(MIN_STAGE_WIDTH, Math.floor(naturalW * scale));
+      const stageH = Math.max(160, Math.floor(naturalH * scale));
 
       stage.style.width = `${stageW}px`;
       stage.style.height = `${stageH}px`;
+
       centerStageWrap();
+      updateLines();
     }
 
     function getStageAspectRatio() {
-      if (mainImage.naturalWidth && mainImage.naturalHeight) {
-        return mainImage.naturalWidth / mainImage.naturalHeight;
-      }
+      const w = getSourceWidth();
+      const h = getSourceHeight();
+      if (w && h) return w / h;
       return stage.clientWidth / stage.clientHeight;
     }
 
@@ -827,7 +798,7 @@
     }
 
     function stagePointToImagePoint(point, imageRect) {
-      const exportScale = mainImage.naturalWidth / imageRect.width;
+      const exportScale = getSourceWidth() / imageRect.width;
       return {
         x: (point.x - imageRect.x) * exportScale,
         y: (point.y - imageRect.y) * exportScale
@@ -853,6 +824,8 @@
       ctx.beginPath();
       ctx.rect(x, y, size, size);
       ctx.clip();
+
+      // Our SVG viewBox is 10 10 80 80
       ctx.translate(x, y);
       ctx.scale(size / 80, size / 80);
       ctx.translate(-10, -10);
@@ -875,25 +848,95 @@
       ctx.stroke();
     }
 
-    async function downloadModifiedImage() {
-      if (!mainImage.naturalWidth || !mainImage.naturalHeight) {
-        alert("Please upload an image first.");
-        return;
+    function getPreferredInputExport() {
+      const ext = currentInputExt.toLowerCase();
+      const type = currentInputType.toLowerCase();
+
+      if (type === "image/png" || ext === "png") {
+        return { type: "image/png", ext: "png", quality: undefined, label: "PNG" };
       }
 
+      if (type === "image/jpeg" || ["jpg", "jpeg", "jfif", "pjpeg", "pjp"].includes(ext)) {
+        return {
+          type: "image/jpeg",
+          ext: ext === "jfif" ? "jfif" : "jpg",
+          quality: 0.92,
+          label: ext === "jfif" ? "JFIF/JPEG" : "JPEG"
+        };
+      }
+
+      if (type === "image/tiff" || ["tif", "tiff"].includes(ext)) {
+        return {
+          type: "image/tiff",
+          ext: ext === "tiff" ? "tiff" : "tif",
+          quality: undefined,
+          label: "TIFF"
+        };
+      }
+
+      // fallback for unsupported "same as input"
+      return {
+        type: "image/png",
+        ext: "png",
+        quality: undefined,
+        label: "PNG fallback"
+      };
+    }
+
+    function getExportSettings() {
+      const selected = exportFormat.value;
+
+      if (selected === "same") return getPreferredInputExport();
+      if (selected === "jpeg") return { type: "image/jpeg", ext: "jpg", quality: 0.92, label: "JPEG" };
+      if (selected === "tiff") return { type: "image/tiff", ext: "tif", quality: undefined, label: "TIFF" };
+      return { type: "image/png", ext: "png", quality: undefined, label: "PNG" };
+    }
+
+    function updateExportFormatNote() {
+      const settings = getExportSettings();
+      const inputInfo = currentInputSizeBytes
+        ? `Input: .${currentInputExt || "unknown"}, ${formatBytes(currentInputSizeBytes)}.`
+        : "No image uploaded yet.";
+
+      const selected = exportFormat.value;
+      let note = "";
+      let estimate = "";
+
+      if (selected === "png") {
+        note = "PNG is lossless and keeps tags/lines very sharp.";
+        estimate = "Expected size: usually large.";
+      } else if (selected === "jpeg") {
+        note = "JPEG is smaller for photos, but lossy.";
+        estimate = "Expected size: usually smaller than PNG.";
+      } else if (selected === "tiff") {
+        note = "TIFF is useful in scientific workflows and is exported using a frontend JS library.";
+        estimate = "Expected size: often large to very large.";
+      } else {
+        note = `Same as input will export as ${settings.label}. Unsupported formats fall back to PNG.`;
+        estimate = "Expected size: depends on the matched output format.";
+      }
+
+      exportFormatNote.textContent = `${inputInfo} Output: ${settings.label}. ${note} ${estimate}`;
+    }
+
+    function buildExportCanvas() {
       const imageRect = getRenderedImageRect();
-      if (!imageRect) return;
+      if (!imageRect) return null;
+
+      const sourceW = getSourceWidth();
+      const sourceH = getSourceHeight();
 
       const canvas = document.createElement("canvas");
-      canvas.width = mainImage.naturalWidth;
-      canvas.height = mainImage.naturalHeight;
+      canvas.width = sourceW;
+      canvas.height = sourceH;
 
       const ctx = canvas.getContext("2d");
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(mainImage, 0, 0, canvas.width, canvas.height);
 
-      const exportScale = mainImage.naturalWidth / imageRect.width;
+      ctx.drawImage(originalSourceForExport, 0, 0, canvas.width, canvas.height);
+
+      const exportScale = sourceW / imageRect.width;
 
       const tl = getTag("tl");
       const tr = getTag("tr");
@@ -902,7 +945,7 @@
 
       ctx.save();
       ctx.strokeStyle = "rgb(52, 52, 52)";
-      ctx.lineWidth = Math.max(1.25, 1.25 * exportScale);
+      ctx.lineWidth = Math.max(1.5, 1.5 * exportScale);
       ctx.setLineDash([10 * exportScale, 6 * exportScale]);
       ctx.lineCap = "butt";
 
@@ -910,7 +953,6 @@
       drawCanvasLine(ctx, getExportCorner(tr, "bottomRight", imageRect), getExportCorner(br, "topRight", imageRect));
       drawCanvasLine(ctx, getExportCorner(br, "bottomLeft", imageRect), getExportCorner(bl, "bottomRight", imageRect));
       drawCanvasLine(ctx, getExportCorner(bl, "topLeft", imageRect), getExportCorner(tl, "bottomLeft", imageRect));
-
       ctx.restore();
 
       for (const tag of tags) {
@@ -924,20 +966,61 @@
         drawSvgTagAsVector(ctx, tag, drawX, drawY, drawSize);
       }
 
+      return canvas;
+    }
+
+    function downloadBlob(blob, extension) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${currentFileName}-with-apriltags.${extension}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function exportCanvasAsTIFF(canvas, extension = "tif") {
+      if (typeof UTIF === "undefined") {
+        throw new Error("UTIF.js is not available.");
+      }
+
+      const ctx = canvas.getContext("2d");
+      const rgba = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const tiffData = UTIF.encodeImage(rgba, canvas.width, canvas.height);
+
+      const blob = new Blob([tiffData], { type: "image/tiff" });
+      downloadBlob(blob, extension);
+    }
+
+    async function downloadModifiedImage() {
+      if (!originalSourceForExport || !getSourceWidth() || !getSourceHeight()) {
+        alert("Please upload an image first.");
+        return;
+      }
+
+      const outputCanvas = buildExportCanvas();
+      if (!outputCanvas) {
+        alert("Failed to build export canvas.");
+        return;
+      }
+
       const settings = getExportSettings();
 
-      canvas.toBlob(blob => {
+      if (settings.type === "image/tiff") {
+        try {
+          await exportCanvasAsTIFF(outputCanvas, settings.ext);
+        } catch (error) {
+          console.error(error);
+          alert("TIFF export failed. Please try PNG instead.");
+        }
+        return;
+      }
+
+      outputCanvas.toBlob(blob => {
         if (!blob) {
           alert("Failed to export image. Try PNG instead.");
           return;
         }
-
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${currentFileName}-with-apriltags.${settings.ext}`;
-        link.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, settings.ext);
       }, settings.type, settings.quality);
     }
 
@@ -1033,28 +1116,320 @@
       return startSize + delta;
     }
 
-    imageInput.addEventListener("change", event => {
-      const file = event.target.files && event.target.files[0];
-      if (!file) return;
+    function getDefaultRoiRect() {
+  const rect = getTagBoundsLimit();
+
+  const marginX = rect.width * ROI_MARGIN_RATIO;
+  const marginY = rect.height * ROI_MARGIN_RATIO;
+
+  return {
+    x: rect.x + marginX,
+    y: rect.y + marginY,
+    width: rect.width * (1 - ROI_MARGIN_RATIO * 2),
+    height: rect.height * (1 - ROI_MARGIN_RATIO * 2)
+  };
+}
+
+function colorDistanceSq(r1, g1, b1, r2, g2, b2) {
+  const dr = r1 - r2;
+  const dg = g1 - g2;
+  const db = b1 - b2;
+  return dr * dr + dg * dg + db * db;
+}
+
+function getAverageBorderColor(imageData, width, height) {
+  const data = imageData.data;
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let count = 0;
+
+  const borderThickness = Math.max(2, Math.round(Math.min(width, height) * 0.03));
+
+  function addPixel(x, y) {
+    const i = (y * width + x) * 4;
+    const alpha = data[i + 3];
+
+    if (alpha < 20) return;
+
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
+    count += 1;
+  }
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const isBorder =
+        x < borderThickness ||
+        x >= width - borderThickness ||
+        y < borderThickness ||
+        y >= height - borderThickness;
+
+      if (isBorder) addPixel(x, y);
+    }
+  }
+
+  if (!count) {
+    return { r: 255, g: 255, b: 255 };
+  }
+
+  return {
+    r: r / count,
+    g: g / count,
+    b: b / count
+  };
+}
+
+function getAdaptiveRoiRect() {
+  const defaultRoi = getDefaultRoiRect();
+
+  if (!originalSourceForExport || !getSourceWidth() || !getSourceHeight()) {
+    return defaultRoi;
+  }
+
+  const sourceW = getSourceWidth();
+  const sourceH = getSourceHeight();
+
+  const maxAnalysisSize = 220;
+  const scale = Math.min(maxAnalysisSize / sourceW, maxAnalysisSize / sourceH, 1);
+
+  const analysisW = Math.max(1, Math.round(sourceW * scale));
+  const analysisH = Math.max(1, Math.round(sourceH * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = analysisW;
+  canvas.height = analysisH;
+
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(originalSourceForExport, 0, 0, analysisW, analysisH);
+
+  const imageData = ctx.getImageData(0, 0, analysisW, analysisH);
+  const data = imageData.data;
+  const bg = getAverageBorderColor(imageData, analysisW, analysisH);
+
+  let minX = analysisW;
+  let minY = analysisH;
+  let maxX = -1;
+  let maxY = -1;
+  let foregroundCount = 0;
+
+  const thresholdSq = 70 * 70;
+
+  // Ignore the outer 2% border during detection.
+  // This prevents noisy image borders from expanding the ROI to the whole image.
+  const ignoreX = Math.round(analysisW * 0.02);
+  const ignoreY = Math.round(analysisH * 0.02);
+
+  for (let y = ignoreY; y < analysisH - ignoreY; y++) {
+    for (let x = ignoreX; x < analysisW - ignoreX; x++) {
+      const i = (y * analysisW + x) * 4;
+      const alpha = data[i + 3];
+
+      if (alpha < 20) continue;
+
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      const distSq = colorDistanceSq(r, g, b, bg.r, bg.g, bg.b);
+
+      if (distSq > thresholdSq) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+        foregroundCount += 1;
+      }
+    }
+  }
+
+  const totalPixels = analysisW * analysisH;
+  const foregroundRatio = foregroundCount / totalPixels;
+
+  if (
+    foregroundRatio < 0.01 ||
+    minX >= maxX ||
+    minY >= maxY
+  ) {
+    return defaultRoi;
+  }
+
+  const boxW = maxX - minX;
+  const boxH = maxY - minY;
+  const boxAreaRatio = (boxW * boxH) / totalPixels;
+
+  const touchesLeft = minX <= analysisW * 0.04;
+  const touchesRight = maxX >= analysisW * 0.96;
+  const touchesTop = minY <= analysisH * 0.04;
+  const touchesBottom = maxY >= analysisH * 0.96;
+
+  const touchedBorderCount = [touchesLeft, touchesRight, touchesTop, touchesBottom]
+    .filter(Boolean).length;
+
+  // Very important:
+  // if the detected ROI is almost the whole image, reject it.
+  if (
+    boxAreaRatio > 0.72 ||
+    boxW > analysisW * 0.88 ||
+    boxH > analysisH * 0.88 ||
+    touchedBorderCount >= 2
+  ) {
+    return defaultRoi;
+  }
+
+  const paddingX = analysisW * 0.04;
+  const paddingY = analysisH * 0.04;
+
+  minX = clamp(minX - paddingX, 0, analysisW);
+  minY = clamp(minY - paddingY, 0, analysisH);
+  maxX = clamp(maxX + paddingX, 0, analysisW);
+  maxY = clamp(maxY + paddingY, 0, analysisH);
+
+  const imageRect = getTagBoundsLimit();
+
+  let roi = {
+    x: imageRect.x + (minX / analysisW) * imageRect.width,
+    y: imageRect.y + (minY / analysisH) * imageRect.height,
+    width: ((maxX - minX) / analysisW) * imageRect.width,
+    height: ((maxY - minY) / analysisH) * imageRect.height
+  };
+
+  // Clamp adaptive ROI so it never becomes bigger than the safe 90% default ROI.
+  const roiRight = Math.min(roi.x + roi.width, defaultRoi.x + defaultRoi.width);
+  const roiBottom = Math.min(roi.y + roi.height, defaultRoi.y + defaultRoi.height);
+
+  roi.x = Math.max(roi.x, defaultRoi.x);
+  roi.y = Math.max(roi.y, defaultRoi.y);
+  roi.width = roiRight - roi.x;
+  roi.height = roiBottom - roi.y;
+
+  const largestTagSize = Math.max(...tags.map(tag => getTagSize(tag)));
+
+  if (
+    roi.width < largestTagSize * 2 ||
+    roi.height < largestTagSize * 2
+  ) {
+    return defaultRoi;
+  }
+
+  return roi;
+}
+
+function resetTagsToCorners() {
+  const roi = getAdaptiveRoiRect();
+
+  const tl = getTag("tl");
+  const tr = getTag("tr");
+  const bl = getTag("bl");
+  const br = getTag("br");
+
+  setPos(tl, roi.x, roi.y);
+  setPos(tr, roi.x + roi.width - getTagSize(tr), roi.y);
+  setPos(bl, roi.x, roi.y + roi.height - getTagSize(bl));
+  setPos(br, roi.x + roi.width - getTagSize(br), roi.y + roi.height - getTagSize(br));
+
+  updateLines();
+}
+
+    async function loadTiffFile(file) {
+      const buffer = await file.arrayBuffer();
+      const ifds = UTIF.decode(buffer);
+      if (!ifds || !ifds.length) {
+        throw new Error("No TIFF image found.");
+      }
+
+      UTIF.decodeImage(buffer, ifds[0]);
+      const rgba = UTIF.toRGBA8(ifds[0]);
+
+      const width = ifds[0].width;
+      const height = ifds[0].height;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext("2d");
+      const imageData = ctx.createImageData(width, height);
+      imageData.data.set(rgba);
+      ctx.putImageData(imageData, 0, 0);
+
+      originalSourceForExport = canvas;
+      originalPixelWidth = width;
+      originalPixelHeight = height;
+
+      return new Promise((resolve, reject) => {
+        canvas.toBlob(blob => {
+          if (!blob) {
+            reject(new Error("Failed to create preview blob from TIFF."));
+            return;
+          }
+
+          if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
+          currentPreviewUrl = URL.createObjectURL(blob);
+          mainImage.onload = resolve;
+          mainImage.onerror = reject;
+          mainImage.src = currentPreviewUrl;
+        }, "image/png");
+      });
+    }
+
+    async function loadNormalBrowserImage(file) {
+      if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
+      currentPreviewUrl = URL.createObjectURL(file);
+
+      return new Promise((resolve, reject) => {
+        mainImage.onload = () => {
+          originalSourceForExport = mainImage;
+          originalPixelWidth = mainImage.naturalWidth;
+          originalPixelHeight = mainImage.naturalHeight;
+          resolve();
+        };
+        mainImage.onerror = reject;
+        mainImage.src = currentPreviewUrl;
+      });
+    }
+
+    async function handleImageUpload(file) {
+      downloadBtn.classList.remove("ready-download");
 
       currentFileName = file.name.replace(/[.][^.]+$/, "");
       currentInputType = file.type || "image/png";
       currentInputExt = getFileExtension(file.name) || currentInputType.replace("image/", "") || "png";
       currentInputSizeBytes = file.size || 0;
+
       updateExportFormatNote();
 
-      if (imageObjectUrl) URL.revokeObjectURL(imageObjectUrl);
-      imageObjectUrl = URL.createObjectURL(file);
+      const isTiffInput =
+        currentInputType.toLowerCase() === "image/tiff" ||
+        ["tif", "tiff"].includes(currentInputExt.toLowerCase());
 
-      mainImage.src = imageObjectUrl;
+      try {
+        if (isTiffInput) {
+          await loadTiffFile(file);
+        } else {
+          await loadNormalBrowserImage(file);
+        }
 
-      mainImage.onload = () => {
         emptyMessage.style.display = "none";
         stage.classList.add("has-image");
 
         fitStageToRightPanel();
         resetTagsToCorners();
-      };
+        updateExportFormatNote();
+
+        downloadBtn.classList.add("ready-download");
+      } catch (error) {
+        console.error(error);
+        alert("Failed to load the image.");
+      }
+    }
+
+    imageInput.addEventListener("change", async event => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      await handleImageUpload(file);
     });
 
     resetBtn.addEventListener("click", resetTagsToCorners);
@@ -1224,6 +1599,17 @@
     });
 
     window.addEventListener("resize", () => {
+      if (!getSourceWidth() || !getSourceHeight()) return;
+
+      const stagePos = getStageWrapPos();
+      const maxX = Math.max(0, main.clientWidth - stage.clientWidth);
+      const maxY = Math.max(0, main.clientHeight - stage.clientHeight);
+
+      setStageWrapPos(
+        clamp(stagePos.x, 0, maxX),
+        clamp(stagePos.y, 0, maxY)
+      );
+
       updateLines();
     });
 
