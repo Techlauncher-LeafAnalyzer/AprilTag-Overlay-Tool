@@ -29,22 +29,25 @@
       padding: 0;
       width: 100%;
       height: 100%;
+      overflow: hidden; /* important: stop the whole page from scrolling */
       font-family: Arial, Helvetica, sans-serif;
       color: var(--text);
       background: #ffffff;
     }
 
     .app {
-      min-height: 100vh;
+      height: 100vh;     /* important */
+      min-height: 0;     /* important */
       display: grid;
       grid-template-columns: 340px 1fr;
     }
 
     .sidebar {
+      height: 100vh;     /* left menu uses its own scrollbar */
       padding: 20px;
       background: var(--panel-bg);
       border-right: 1px solid var(--border);
-      overflow: auto;
+      overflow-y: auto;
       z-index: 20;
     }
 
@@ -143,6 +146,12 @@
       color: var(--muted);
     }
 
+    .tag {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+    }
+
     .tag-control {
       padding: 12px;
       border: 1px solid var(--border);
@@ -176,8 +185,8 @@
 
     .main {
       position: relative;
-      min-width: 0;
-      min-height: 100vh;
+      height: 100vh;     /* right viewer is exactly visible height */
+      min-height: 0;
       padding: 12px;
       overflow: auto;
       background:
@@ -360,7 +369,7 @@
           </svg>
 
           <!-- Top Left -->
-          <div class="tag" data-id="tl" data-name="Top Left" data-label="Tag 0" data-size="100" style="left: 0px; top: 0px;">
+          <div class="tag" data-id="tl" data-name="Top Left" data-label="Tag 0" data-size="80" style="left: 0px; top: 0px;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 80 80">
               <path style="fill:#ffffff; stroke:none;" d="M0 0L0 100L100 100L100 0L0 0z"></path>
               <path style="fill:#000000; stroke:none;" d="M10 10L10 90L90 90L90 10L10 10z"></path>
@@ -370,7 +379,7 @@
           </div>
 
           <!-- Top Right -->
-          <div class="tag" data-id="tr" data-name="Top Right" data-label="Tag 1" data-size="100" style="left: 0px; top: 0px;">
+          <div class="tag" data-id="tr" data-name="Top Right" data-label="Tag 1" data-size="80" style="left: 0px; top: 0px;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 80 80">
               <path style="fill:#ffffff; stroke:none;" d="M0 0L0 100L100 100L100 0L0 0z"></path>
               <path style="fill:#000000; stroke:none;" d="M10 10L10 90L90 90L90 10L10 10z"></path>
@@ -379,7 +388,7 @@
           </div>
 
           <!-- Bottom Left -->
-          <div class="tag" data-id="bl" data-name="Bottom Left" data-label="Tag 2" data-size="100" style="left: 0px; top: 0px;">
+          <div class="tag" data-id="bl" data-name="Bottom Left" data-label="Tag 2" data-size="80" style="left: 0px; top: 0px;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 80 80">
               <path style="fill:#ffffff; stroke:none;" d="M0 0L0 100L100 100L100 0L0 0z"></path>
               <path style="fill:#000000; stroke:none;" d="M10 10L10 90L90 90L90 10L10 10z"></path>
@@ -388,7 +397,7 @@
           </div>
 
           <!-- Bottom Right -->
-          <div class="tag" data-id="br" data-name="Bottom Right" data-label="Tag 3" data-size="100" style="left: 0px; top: 0px;">
+          <div class="tag" data-id="br" data-name="Bottom Right" data-label="Tag 3" data-size="80" style="left: 0px; top: 0px;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 10 80 80">
               <path style="fill:#ffffff; stroke:none;" d="M0 0L0 100L100 100L100 0L0 0z"></path>
               <path style="fill:#000000; stroke:none;" d="M10 10L10 90L90 90L90 10L10 10z"></path>
@@ -425,6 +434,7 @@
     const TAG_EDGE_SIZE = 8;
     const STAGE_EDGE_SIZE = 12;
     const MIN_TAG_SIZE = 20;
+    const INITIAL_TAG_SIZE = 80;
     const MAX_TAG_SIZE = 1000;
     const MIN_STAGE_WIDTH = 220;
     const MAX_STAGE_WIDTH = 5000;
@@ -477,7 +487,7 @@
     }
 
     function getTagSize(tag) {
-      return Number(tag.dataset.size) || 100;
+      return Number(tag.dataset.size) || INITIAL_TAG_SIZE;
     }
 
     function getPos(tag) {
@@ -503,8 +513,9 @@
     }
 
     function centerStageWrap() {
-      const x = Math.max(0, (main.clientWidth - stage.offsetWidth) / 2);
-      const y = Math.max(0, (main.clientHeight - stage.offsetHeight) / 2);
+      const x = main.scrollLeft + Math.max(0, (main.clientWidth - stage.offsetWidth) / 2);
+      const y = main.scrollTop + Math.max(0, (main.clientHeight - stage.offsetHeight) / 2);
+
       setStageWrapPos(x, y);
     }
 
@@ -699,10 +710,15 @@
       const naturalH = getSourceHeight();
       if (!naturalW || !naturalH) return;
 
-      const availableWidth = Math.max(220, main.clientWidth - 24);
-      const availableHeight = Math.max(220, main.clientHeight - 24);
+      const padding = 24;
 
-      const scale = Math.min(availableWidth / naturalW, availableHeight / naturalH);
+      const availableWidth = Math.max(220, main.clientWidth - padding);
+      const availableHeight = Math.max(160, main.clientHeight - padding);
+
+      const scale = Math.min(
+        availableWidth / naturalW,
+        availableHeight / naturalH
+      );
 
       const stageW = Math.max(MIN_STAGE_WIDTH, Math.floor(naturalW * scale));
       const stageH = Math.max(160, Math.floor(naturalH * scale));
@@ -1601,15 +1617,10 @@ function resetTagsToCorners() {
     window.addEventListener("resize", () => {
       if (!getSourceWidth() || !getSourceHeight()) return;
 
-      const stagePos = getStageWrapPos();
-      const maxX = Math.max(0, main.clientWidth - stage.clientWidth);
-      const maxY = Math.max(0, main.clientHeight - stage.clientHeight);
+      const layouts = getRelativeTagLayouts();
 
-      setStageWrapPos(
-        clamp(stagePos.x, 0, maxX),
-        clamp(stagePos.y, 0, maxY)
-      );
-
+      fitStageToRightPanel();
+      applyRelativeTagLayouts(layouts);
       updateLines();
     });
 
