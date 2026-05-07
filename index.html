@@ -144,6 +144,7 @@
       font-size: 12px;
       line-height: 1.45;
       color: var(--muted);
+      white-space: pre-line;
     }
 
     .tag {
@@ -304,6 +305,135 @@
         min-height: 70vh;
       }
     }
+    .upload-field {
+      display: block;
+    }
+
+    .upload-title {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .visually-hidden-file {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .upload-card {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      cursor: pointer;
+      transition:
+        border-color 0.18s ease,
+        background 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.18s ease;
+    }
+
+    .upload-card.empty {
+      border: 1.5px dashed #ffb766;
+      background: linear-gradient(180deg, #fffaf4 0%, #fff6eb 100%);
+      box-shadow: 0 0 0 3px rgba(255, 138, 31, 0.10);
+    }
+
+    .upload-card.empty:hover {
+      border-color: #ff9a2f;
+      background: linear-gradient(180deg, #fff8f0 0%, #fff2e2 100%);
+      box-shadow: 0 0 0 4px rgba(255, 138, 31, 0.14);
+      transform: translateY(-1px);
+    }
+
+    .upload-card.has-file {
+      border: 1px solid #d5d7dc;
+      background: #ffffff;
+      box-shadow: none;
+    }
+
+    .upload-card.has-file:hover {
+      border-color: #c7ccd4;
+      background: #fcfcfd;
+    }
+
+    .upload-card.dragover {
+      border: 1.5px dashed #ff8a1f;
+      background: #fff2e6;
+      box-shadow: 0 0 0 4px rgba(255, 138, 31, 0.18);
+    }
+
+    .upload-card:focus,
+    .upload-card:focus-visible {
+      outline: none;
+      box-shadow:
+        0 0 0 4px rgba(255, 138, 31, 0.18),
+        0 0 0 1px #ff8a1f inset;
+    }
+
+    .upload-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 700;
+      color: #ff8a1f;
+      background: rgba(255, 138, 31, 0.12);
+      flex-shrink: 0;
+    }
+
+    .upload-copy {
+      min-width: 0;
+    }
+
+    .upload-main-text {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .upload-file-name {
+      font-size: 13px;
+      color: #8a5a22;
+      margin-bottom: 4px;
+      word-break: break-word;
+    }
+
+    .upload-card.has-file .upload-file-name {
+      color: var(--text);
+    }
+
+    .upload-hint {
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+
+    .upload-cta {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid #ffd2a4;
+      background: #ffffff;
+      color: #c76b10;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .upload-card.has-file .upload-cta {
+      border-color: #d8dde5;
+      color: #4e5661;
+    }
   </style>
 </head>
 <body>
@@ -316,10 +446,37 @@
         and download the final overlaid image.
       </p>
 
-      <label class="field">
-        <span>Upload image</span>
-        <input id="imageInput" type="file" accept="image/*,.tif,.tiff,.jfif" />
-      </label>
+    <div class="field upload-field">
+      <span class="upload-title">Upload image</span>
+
+      <input
+        id="imageInput"
+        class="visually-hidden-file"
+        type="file"
+        accept="image/*,.tif,.tiff,.jfif"
+      />
+
+      <div
+        id="uploadCard"
+        class="upload-card empty"
+        role="button"
+        tabindex="0"
+        aria-controls="imageInput"
+        aria-describedby="uploadHint"
+      >
+        <div class="upload-icon" aria-hidden="true">↑</div>
+
+        <div class="upload-copy">
+          <div class="upload-main-text">Choose an image to start</div>
+          <div id="uploadFileName" class="upload-file-name">No file selected yet</div>
+          <div id="uploadHint" class="upload-hint">
+            Supports PNG, JPG, JPEG, JFIF, TIFF and TIF. Click to browse or drag a file here.
+          </div>
+        </div>
+
+        <div class="upload-cta">Browse</div>
+      </div>
+    </div>
 
       <button id="resetBtn" type="button">Reset tags to ROI corners</button>
       <button id="downloadBtn" type="button">Download modified image</button>
@@ -421,6 +578,8 @@
     const exportFormat = document.getElementById("exportFormat");
     const exportFormatNote = document.getElementById("exportFormatNote");
     const tagControls = document.getElementById("tagControls");
+    const uploadCard = document.getElementById("uploadCard");
+    const uploadFileName = document.getElementById("uploadFileName");
 
     const tags = Array.from(document.querySelectorAll(".tag"));
 
@@ -452,6 +611,59 @@
     let originalSourceForExport = null;
     let originalPixelWidth = 0;
     let originalPixelHeight = 0;
+    
+    function setUploadCardEmptyState() {
+      uploadCard.classList.add("empty");
+      uploadCard.classList.remove("has-file");
+      uploadCard.classList.remove("dragover");
+      uploadFileName.textContent = "No file selected yet";
+    }
+
+    function setUploadCardFileState(file) {
+      uploadCard.classList.remove("empty");
+      uploadCard.classList.remove("dragover");
+      uploadCard.classList.add("has-file");
+      uploadFileName.textContent = file ? file.name : "File selected";
+    }
+
+    uploadCard.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      imageInput.click();
+    });
+
+    uploadCard.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        imageInput.click();
+      }
+    });
+
+    ["dragenter", "dragover"].forEach(type => {
+      uploadCard.addEventListener(type, event => {
+        event.preventDefault();
+        uploadCard.classList.add("dragover");
+      });
+    });
+
+    ["dragleave", "dragend", "drop"].forEach(type => {
+      uploadCard.addEventListener(type, event => {
+        event.preventDefault();
+        uploadCard.classList.remove("dragover");
+      });
+    });
+
+    uploadCard.addEventListener("drop", async event => {
+      const file = event.dataTransfer?.files?.[0];
+      if (!file) return;
+
+      if (event.dataTransfer.files.length) {
+        imageInput.files = event.dataTransfer.files;
+      }
+
+      setUploadCardFileState(file);
+      await handleImageUpload(file);
+    });
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
@@ -932,7 +1144,7 @@
         estimate = "Expected size: depends on the matched output format.";
       }
 
-      exportFormatNote.textContent = `${inputInfo} Output: ${settings.label}. ${note} ${estimate}`;
+      exportFormatNote.textContent = `${inputInfo}\nOutput: ${settings.label}. ${note} ${estimate}`;
     }
 
     function buildExportCanvas() {
@@ -1444,7 +1656,12 @@ function resetTagsToCorners() {
 
     imageInput.addEventListener("change", async event => {
       const file = event.target.files && event.target.files[0];
-      if (!file) return;
+      if (!file) {
+        setUploadCardEmptyState();
+        return;
+      }
+
+      setUploadCardFileState(file);
       await handleImageUpload(file);
     });
 
@@ -1626,6 +1843,7 @@ function resetTagsToCorners() {
 
     makeControls();
     updateExportFormatNote();
+    setUploadCardEmptyState();
     resetTagsToCorners();
   </script>
 </body>
