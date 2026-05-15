@@ -151,7 +151,8 @@ select {
 }
 
 .field span,
-.export-panel label {
+.export-panel label,
+.padding-panel label {
   display: block;
   margin-bottom: 7px;
   color: #344054;
@@ -278,8 +279,13 @@ button:active {
     0 0 0 4px rgba(255, 122, 26, 0.16);
 }
 
-.export-panel {
+.export-panel,
+.padding-panel {
   margin: 0;
+}
+
+.padding-panel input[type="number"] {
+  margin-bottom: 9px;
 }
 
 .export-note {
