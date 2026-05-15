@@ -5,6 +5,7 @@ const imageInput = document.getElementById("imageInput");
 const mainImage = document.getElementById("mainImage");
 const emptyMessage = document.getElementById("emptyMessage");
 const resetBtn = document.getElementById("resetBtn");
+const padImageBtn = document.getElementById("padImageBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 const exportFormat = document.getElementById("exportFormat");
 const exportFormatNote = document.getElementById("exportFormatNote");
@@ -29,6 +30,7 @@ const MAX_TAG_SIZE = 1000;
 const MIN_STAGE_WIDTH = 220;
 const MAX_STAGE_WIDTH = 5000;
 const ROI_MARGIN_RATIO = 0.05;
+const EDGE_PADDING_PX = 100;
 
 let activeAction = null;
 let selectedTag = null;
@@ -1089,6 +1091,77 @@ function resetTagsToCorners() {
   updateLines();
 }
 
+function addPaddingToImage(padding = EDGE_PADDING_PX) {
+  if (!originalSourceForExport || !getSourceWidth() || !getSourceHeight()) {
+    alert("Please upload an image first.");
+    return;
+  }
+
+  const sourceW = getSourceWidth();
+  const sourceH = getSourceHeight();
+  const newW = sourceW + padding * 2;
+  const newH = sourceH + padding * 2;
+
+  const renderedRect = getRenderedImageRect();
+  const tagImageLayouts = renderedRect
+    ? tags.map((tag) => {
+        const pos = getPos(tag);
+        return {
+          tag,
+          imgX: ((pos.x - renderedRect.x) / renderedRect.width) * sourceW,
+          imgY: ((pos.y - renderedRect.y) / renderedRect.height) * sourceH,
+          imgSize: (getTagSize(tag) / renderedRect.width) * sourceW,
+        };
+      })
+    : [];
+
+  const canvas = document.createElement("canvas");
+  canvas.width = newW;
+  canvas.height = newH;
+
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, newW, newH);
+  ctx.drawImage(originalSourceForExport, padding, padding, sourceW, sourceH);
+
+  originalSourceForExport = canvas;
+  originalPixelWidth = newW;
+  originalPixelHeight = newH;
+
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      alert("Failed to add padding to the image.");
+      return;
+    }
+
+    if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
+    currentPreviewUrl = URL.createObjectURL(blob);
+
+    mainImage.onload = () => {
+      fitStageToRightPanel();
+
+      const nextRect = getRenderedImageRect();
+      if (nextRect && tagImageLayouts.length) {
+        const scale = nextRect.width / newW;
+        tagImageLayouts.forEach((item) => {
+          const nextSize = item.imgSize * scale;
+          item.tag.dataset.size = String(nextSize);
+          item.tag.style.width = `${nextSize}px`;
+          item.tag.style.height = `${nextSize}px`;
+          setPos(
+            item.tag,
+            nextRect.x + (item.imgX + padding) * scale,
+            nextRect.y + (item.imgY + padding) * scale,
+          );
+        });
+      }
+
+      updateLines();
+    };
+    mainImage.src = currentPreviewUrl;
+  }, "image/png");
+}
+
 async function loadTiffFile(file) {
   const buffer = await file.arrayBuffer();
   const ifds = UTIF.decode(buffer);
@@ -1197,6 +1270,7 @@ imageInput.addEventListener("change", async (event) => {
 });
 
 resetBtn.addEventListener("click", resetTagsToCorners);
+padImageBtn.addEventListener("click", () => addPaddingToImage());
 downloadBtn.addEventListener("click", downloadModifiedImage);
 exportFormat.addEventListener("change", updateExportFormatNote);
 
