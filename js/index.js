@@ -6,6 +6,7 @@ const mainImage = document.getElementById("mainImage");
 const emptyMessage = document.getElementById("emptyMessage");
 const resetBtn = document.getElementById("resetBtn");
 const padImageBtn = document.getElementById("padImageBtn");
+const paddingPxInput = document.getElementById("paddingPx");
 const downloadBtn = document.getElementById("downloadBtn");
 const exportFormat = document.getElementById("exportFormat");
 const exportFormatNote = document.getElementById("exportFormatNote");
@@ -30,7 +31,6 @@ const MAX_TAG_SIZE = 1000;
 const MIN_STAGE_WIDTH = 220;
 const MAX_STAGE_WIDTH = 5000;
 const ROI_MARGIN_RATIO = 0.05;
-const EDGE_PADDING_PX = 100;
 
 let activeAction = null;
 let selectedTag = null;
@@ -1134,16 +1134,27 @@ function resetTagsToCorners() {
   updateLines();
 }
 
-function addPaddingToImage(padding = EDGE_PADDING_PX) {
+function getPaddingPxFromInput(
+  defaultPx = 20,
+  maxPx = 5000,
+) {
+  const raw = Number(paddingPxInput && paddingPxInput.value);
+  if (!Number.isFinite(raw) || raw <= 0) return defaultPx;
+  return clamp(Math.round(raw), 1, maxPx);
+}
+
+function addPaddingToImage(padding = 20, maxPx = 5000) {
   if (!originalSourceForExport || !getSourceWidth() || !getSourceHeight()) {
     alert("Please upload an image first.");
     return;
   }
 
+  const pad = clamp(Math.round(Number(padding) || 20), 1, maxPx);
+
   const sourceW = getSourceWidth();
   const sourceH = getSourceHeight();
-  const newW = sourceW + padding * 2;
-  const newH = sourceH + padding * 2;
+  const newW = sourceW + pad * 2;
+  const newH = sourceH + pad * 2;
 
   const renderedRect = getRenderedImageRect();
   const tagImageLayouts = renderedRect
@@ -1165,7 +1176,7 @@ function addPaddingToImage(padding = EDGE_PADDING_PX) {
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, newW, newH);
-  ctx.drawImage(originalSourceForExport, padding, padding, sourceW, sourceH);
+  ctx.drawImage(originalSourceForExport, pad, pad, sourceW, sourceH);
 
   originalSourceForExport = canvas;
   originalPixelWidth = newW;
@@ -1193,8 +1204,8 @@ function addPaddingToImage(padding = EDGE_PADDING_PX) {
           item.tag.style.height = `${nextSize}px`;
           setPos(
             item.tag,
-            nextRect.x + (item.imgX + padding) * scale,
-            nextRect.y + (item.imgY + padding) * scale,
+            nextRect.x + (item.imgX + pad) * scale,
+            nextRect.y + (item.imgY + pad) * scale,
           );
         });
       }
@@ -1313,7 +1324,9 @@ imageInput.addEventListener("change", async (event) => {
 });
 
 resetBtn.addEventListener("click", resetTagsToCorners);
-padImageBtn.addEventListener("click", () => addPaddingToImage());
+padImageBtn.addEventListener("click", () =>
+  addPaddingToImage(getPaddingPxFromInput()),
+);
 downloadBtn.addEventListener("click", downloadModifiedImage);
 exportFormat.addEventListener("change", updateExportFormatNote);
 

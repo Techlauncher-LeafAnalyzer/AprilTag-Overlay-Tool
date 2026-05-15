@@ -72,19 +72,37 @@
               Reset tags to ROI corners
             </button>
             <button
-              id="padImageBtn"
-              class="sidebar-button secondary-action lggc"
-              type="button"
-            >
-              Add 100px padding to image
-            </button>
-            <button
               id="downloadBtn"
               class="sidebar-button primary-action lggc"
               type="button"
             >
               Download modified image
             </button>
+          </section>
+
+          <section class="panel padding-panel" aria-labelledby="paddingTitle">
+            <div class="panel-heading">
+              <h2 id="paddingTitle">Image border</h2>
+              <span>Optional</span>
+            </div>
+            <label for="paddingPx">Pixel border</label>
+            <input
+              id="paddingPx"
+              type="number"
+              min="1"
+              step="1"
+              value="20"
+            />
+            <button
+              id="padImageBtn"
+              class="sidebar-button secondary-action lggc"
+              type="button"
+            >
+              Add border to image
+            </button>
+            <p class="export-note">
+              Adds a white border of this many pixels to every edge of the loaded image.
+            </p>
           </section>
 
           <section class="panel export-panel" aria-labelledby="exportTitle">
@@ -119,9 +137,19 @@
                 Drag the middle to move; drag an edge or corner to resize.
               </p>
               <p>
+                <strong>Scale while dragging</strong>
+                While holding and dragging a tag, scroll the mouse wheel to scale it. Each tick changes the size by 5px.
+              </p>
+              <p>
                 <strong>Stage</strong>
                 Drag the image area to move the whole preview; drag the stage
                 edge or corner to resize it.
+              </p>
+              <p>
+                <strong>Image border</strong>
+                Set the "Pixel border" value and click "Add border to image"
+                to add a white border of that thickness to every edge of the
+                loaded image.
               </p>
               <p>
                 <strong>Connection rule</strong>
