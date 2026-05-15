@@ -846,6 +846,49 @@ function getResizeAnchor(direction) {
   return anchorMap[direction] || "top-left";
 }
 
+function handleTagWheel(tag, event) {
+  if (
+    !activeAction ||
+    activeAction.type !== "tag" ||
+    activeAction.tag !== tag ||
+    activeAction.mode !== "move"
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const step = event.shiftKey ? 20 : 5;
+  const delta = event.deltaY < 0 ? step : -step;
+
+  const oldSize = getTagSize(tag);
+
+  const limit = getTagBoundsLimit();
+  const maxSize = Math.min(MAX_TAG_SIZE, limit.width, limit.height);
+  const newSize = clamp(oldSize + delta, MIN_TAG_SIZE, maxSize);
+
+  if (newSize === oldSize) return;
+
+  const stageBox = stage.getBoundingClientRect();
+  const cursorStageX = event.clientX - stageBox.left;
+  const cursorStageY = event.clientY - stageBox.top;
+
+  tag.dataset.size = String(newSize);
+  tag.style.width = `${newSize}px`;
+  tag.style.height = `${newSize}px`;
+  setPos(tag, cursorStageX - newSize / 2, cursorStageY - newSize / 2);
+
+  const pos = getPos(tag);
+  activeAction.startSize = newSize;
+  activeAction.startTagX =
+    pos.x - (event.clientX - activeAction.startPointerX);
+  activeAction.startTagY =
+    pos.y - (event.clientY - activeAction.startPointerY);
+
+  setSelected(tag);
+  updateLines();
+}
+
 function getSizeFromTagResize(direction, startSize, dx, dy) {
   let delta = 0;
 
@@ -1352,6 +1395,10 @@ tags.forEach((tag) => {
 
   tag.addEventListener("pointerleave", () => {
     if (!activeAction) tag.style.cursor = "move";
+  });
+
+  tag.addEventListener("wheel", (event) => handleTagWheel(tag, event), {
+    passive: false,
   });
 });
 
